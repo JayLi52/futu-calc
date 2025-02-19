@@ -52,6 +52,30 @@
     </div>
 
     <div class="input-group">
+      <label for="cash"
+        >当前现金（{{ currentMarket === "hk" ? "港元" : "元" }}）:</label
+      >
+      <input
+        type="number"
+        id="cash"
+        v-model="cash"
+        step="1"
+        placeholder="请输入当前可用现金"
+      />
+    </div>
+
+    <div class="input-group">
+      <label for="holdingDays">预计持股天数:</label>
+      <input
+        type="number"
+        id="holdingDays"
+        v-model="holdingDays"
+        min="1"
+        placeholder="请输入预计持股天数"
+      />
+    </div>
+
+    <div class="input-group">
       <label
         >买入金额：{{ buyAmount }}
         {{ currentMarket === "hk" ? "港元" : "元" }}</label
@@ -61,6 +85,17 @@
     <div class="input-group">
       <label
         >卖出金额：{{ sellAmount }}
+        {{ currentMarket === "hk" ? "港元" : "元" }}</label
+      >
+    </div>
+
+    <div class="input-group" v-if="needFinancing">
+      <label
+        >需要融资：{{ financingAmount }}
+        {{ currentMarket === "hk" ? "港元" : "元" }}</label
+      >
+      <label
+        >预计融资成本：{{ financingCost }}
         {{ currentMarket === "hk" ? "港元" : "元" }}</label
       >
     </div>
@@ -80,6 +115,8 @@ const currentMarket = ref("hk");
 const buyPrice = ref("");
 const sellPrice = ref("");
 const shares = ref("");
+const cash = ref("");
+const holdingDays = ref("");
 const result = ref("");
 
 const marketTitle = computed(() =>
@@ -96,10 +133,37 @@ const sellAmount = computed(() => {
   return amount.toFixed(2);
 });
 
+// 计算是否需要融资和融资金额
+const needFinancing = computed(() => {
+  const totalCost = Number(buyAmount.value);
+  const availableCash = Number(cash.value) || 0;
+  return totalCost > availableCash;
+});
+
+const financingAmount = computed(() => {
+  if (!needFinancing.value) return 0;
+  const totalCost = Number(buyAmount.value);
+  const availableCash = Number(cash.value) || 0;
+  return (totalCost - availableCash).toFixed(2);
+});
+
+// 计算融资成本
+const financingCost = computed(() => {
+  if (!needFinancing.value || !holdingDays.value) return 0;
+  const amount = Number(financingAmount.value);
+  console.log("amount", amount);
+  const days = Number(holdingDays.value);
+  // 港股年利率6.8%
+  const annualRate = currentMarket.value === "hk" ? 0.068 : 0.08; // A股假设8%
+  return ((amount * annualRate * days) / 365).toFixed(2);
+});
+
 watch(currentMarket, () => {
   buyPrice.value = "";
   sellPrice.value = "";
   shares.value = "";
+  cash.value = "";
+  holdingDays.value = "";
   result.value = "";
 });
 
@@ -140,7 +204,10 @@ const calculateHKProfit = (buyAmt, sellAmt) => {
   const buyFees = calculateHKFees(buyAmt);
   const sellFees = calculateHKFees(sellAmt);
 
-  const totalCost = buyAmt + buyFees.total;
+  // 加入融资成本
+  const financingCostValue = Number(financingCost.value);
+
+  const totalCost = buyAmt + buyFees.total + financingCostValue;
   const totalRevenue = sellAmt - sellFees.total;
   const profit = totalRevenue - totalCost;
 
@@ -149,6 +216,14 @@ const calculateHKProfit = (buyAmt, sellAmt) => {
     <h4>买入详情：</h4>
     <p>买入金额：${buyAmt.toFixed(2)} 港元</p>
     <p>买入费用：${buyFees.total.toFixed(2)} 港元</p>
+    ${
+      needFinancing.value
+        ? `
+    <p>融资金额：${financingAmount.value} 港元</p>
+    <p>融资成本：${financingCostValue.toFixed(2)} 港元</p>
+    `
+        : ""
+    }
     <p>买入成本：${totalCost.toFixed(2)} 港元</p>
     <h4>卖出详情：</h4>
     <p>卖出金额：${sellAmt.toFixed(2)} 港元</p>
@@ -165,10 +240,13 @@ const calculateCNProfit = (buyAmt, sellAmt) => {
   const buyFees = calculateAStockFees(buyAmt, "buy");
   const sellFees = calculateAStockFees(sellAmt, "sell");
 
+  // 加入融资成本
+  const financingCostValue = Number(financingCost.value);
+
   const totalBuyFees = Number(buyFees.total);
   const totalSellFees = Number(sellFees.total);
 
-  const totalCost = buyAmt + totalBuyFees;
+  const totalCost = buyAmt + totalBuyFees + financingCostValue;
   const totalRevenue = sellAmt - totalSellFees;
   const profit = totalRevenue - totalCost;
 
@@ -178,6 +256,14 @@ const calculateCNProfit = (buyAmt, sellAmt) => {
     <p>买入金额：${buyAmt.toFixed(2)} 元</p>
     <p>买入佣金：${buyFees.commission} 元</p>
     <p>过户费：${buyFees.transferFee} 元</p>
+    ${
+      needFinancing.value
+        ? `
+    <p>融资金额：${financingAmount.value} 元</p>
+    <p>融资成本：${financingCostValue.toFixed(2)} 元</p>
+    `
+        : ""
+    }
     <p>买入成本：${totalCost.toFixed(2)} 元</p>
     <h4>卖出详情：</h4>
     <p>卖出金额：${sellAmt.toFixed(2)} 元</p>

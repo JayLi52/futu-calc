@@ -1,6 +1,6 @@
 export function calculateAStockFees(amount, type) {
   // 佣金费用（券商收取）- 最低5元，一般为交易金额的0.025%
-  const commission = Math.max(amount * 0.00025, 5)
+  const commission = Math.max(amount * 0.0003, 5)
   
   // 印花税（仅卖出时收取）- 成交金额的0.05%
   const stampDuty = type === 'sell' ? amount * 0.0005 : 0
